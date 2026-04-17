@@ -1,0 +1,1621 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prima Qualitá Saúde – Auditoria APS</title>
+
+  <!-- Bibliotecas externas -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <style>
+    /* ── Reset & base ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --pri:      #1A4F8A;   /* azul institucional           */
+      --pri-dark: #0F3260;
+      --pri-lite: #E8F0FB;
+      --sec:      #2E8B57;   /* verde sucesso                */
+      --warn:     #D97706;   /* âmbar parcial                */
+      --danger:   #DC2626;   /* vermelho não-atendido        */
+      --muted:    #6B7280;   /* cinza texto secundário       */
+      --bg:       #F4F6FA;
+      --card:     #FFFFFF;
+      --border:   #E2E8F0;
+      --radius:   10px;
+      --shadow:   0 2px 8px rgba(0,0,0,.08);
+    }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: #1F2937;
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    /* ── Cabeçalho institucional ──────────────────────────── */
+    .header {
+      background: linear-gradient(135deg, var(--pri-dark) 0%, var(--pri) 100%);
+      color: #fff;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,0,0,.25);
+    }
+    .header-brand { display: flex; align-items: center; gap: 12px; }
+    .header-logo {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: rgba(255,255,255,.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 800; letter-spacing: -1px;
+    }
+    .header-name { font-size: 17px; font-weight: 700; letter-spacing: .3px; }
+    .header-sub  { font-size: 11px; opacity: .75; letter-spacing: .8px; text-transform: uppercase; }
+    .header-badge {
+      background: rgba(255,255,255,.15);
+      padding: 4px 12px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; letter-spacing: .5px;
+    }
+
+    /* ── Layout principal ─────────────────────────────────── */
+    .main { max-width: 1400px; margin: 0 auto; padding: 24px 24px 60px; }
+
+    /* ── Seção de upload ──────────────────────────────────── */
+    .upload-section { margin-bottom: 24px; }
+    .upload-section h2 { font-size: 15px; font-weight: 600; color: var(--pri); margin-bottom: 12px; }
+
+    .drop-zone {
+      border: 2px dashed #93C5FD;
+      border-radius: var(--radius);
+      background: var(--pri-lite);
+      padding: 36px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--pri);
+      background: #D1E4F8;
+    }
+    .drop-zone .dz-icon { font-size: 40px; margin-bottom: 8px; }
+    .drop-zone h3 { font-size: 15px; font-weight: 600; color: var(--pri); }
+    .drop-zone p  { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .drop-zone input[type="file"] { display: none; }
+
+    /* Botão upload */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 18px; border-radius: 6px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: all .15s;
+    }
+    .btn-primary { background: var(--pri); color: #fff; }
+    .btn-primary:hover { background: var(--pri-dark); }
+    .btn-success { background: var(--sec); color: #fff; }
+    .btn-success:hover { background: #1f6b40; }
+    .btn-outline {
+      background: transparent; color: var(--pri);
+      border: 1.5px solid var(--pri);
+    }
+    .btn-outline:hover { background: var(--pri-lite); }
+    .btn-danger  { background: var(--danger); color: #fff; }
+    .btn-danger:hover  { background: #b91c1c; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* Lista de arquivos carregados */
+    .file-list { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .file-chip {
+      display: flex; align-items: center; gap: 6px;
+      background: #fff; border: 1px solid var(--border);
+      border-radius: 20px; padding: 4px 10px 4px 8px;
+      font-size: 12px; box-shadow: var(--shadow);
+    }
+    .file-chip .chip-icon { font-size: 16px; }
+    .file-chip .chip-name { font-weight: 500; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-chip .chip-size { color: var(--muted); font-size: 11px; }
+    .file-chip .chip-remove { cursor: pointer; color: var(--muted); font-size: 15px; line-height: 1; }
+    .file-chip .chip-remove:hover { color: var(--danger); }
+
+    /* ── Configurações de período ─────────────────────────── */
+    .config-bar {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 20px;
+      display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;
+      margin-bottom: 24px; box-shadow: var(--shadow);
+    }
+    .config-bar .field { display: flex; flex-direction: column; gap: 4px; }
+    .config-bar label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .config-bar input,
+    .config-bar select {
+      padding: 7px 10px; border: 1px solid var(--border);
+      border-radius: 6px; font-size: 13px; background: #fff;
+      outline: none; min-width: 140px;
+    }
+    .config-bar input:focus,
+    .config-bar select:focus { border-color: var(--pri); }
+
+    /* ── Barra de progresso ───────────────────────────────── */
+    .progress-wrap {
+      margin-bottom: 24px; display: none;
+    }
+    .progress-wrap.visible { display: block; }
+    .progress-label { font-size: 12px; font-weight: 600; color: var(--pri); margin-bottom: 6px; }
+    .progress-bar-bg {
+      width: 100%; height: 8px; background: var(--border);
+      border-radius: 4px; overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%; background: linear-gradient(90deg, var(--pri), #38BDF8);
+      border-radius: 4px; transition: width .3s ease;
+      width: 0%;
+    }
+    .progress-steps { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .step-badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 10px;
+      background: var(--border); color: var(--muted); font-weight: 500;
+    }
+    .step-badge.done { background: #D1FAE5; color: #065F46; }
+    .step-badge.active { background: var(--pri-lite); color: var(--pri); }
+
+    /* ── Alertas / logs ───────────────────────────────────── */
+    .alert {
+      padding: 10px 14px; border-radius: 8px;
+      font-size: 12px; margin-bottom: 12px; display: flex; gap: 8px;
+    }
+    .alert-info    { background: #EFF6FF; color: #1D4ED8; border-left: 3px solid #3B82F6; }
+    .alert-success { background: #F0FDF4; color: #166534; border-left: 3px solid var(--sec); }
+    .alert-warn    { background: #FFFBEB; color: #92400E; border-left: 3px solid var(--warn); }
+    .alert-error   { background: #FEF2F2; color: #991B1B; border-left: 3px solid var(--danger); }
+    #log-area { margin-bottom: 20px; }
+
+    /* ── Seção de resultados ──────────────────────────────── */
+    #results-section { display: none; }
+    #results-section.visible { display: block; }
+
+    /* ── Tabs de indicadores ──────────────────────────────── */
+    .tabs-bar {
+      display: flex; gap: 4px; overflow-x: auto;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 20px; padding-bottom: 0;
+    }
+    .tab {
+      padding: 8px 16px; border-radius: 8px 8px 0 0;
+      border: 1px solid transparent; border-bottom: none;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      background: transparent; color: var(--muted);
+      white-space: nowrap; transition: all .15s;
+      position: relative; bottom: -2px;
+    }
+    .tab:hover { color: var(--pri); background: var(--pri-lite); }
+    .tab.active {
+      background: var(--card); color: var(--pri);
+      border-color: var(--border); border-bottom-color: var(--card);
+    }
+    .tab .tab-count {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--pri); color: #fff;
+      width: 18px; height: 18px; border-radius: 50%;
+      font-size: 10px; margin-left: 5px;
+    }
+    .tab.active .tab-count { background: var(--pri); }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ── Cards do dashboard ───────────────────────────────── */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px; margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 18px;
+      box-shadow: var(--shadow);
+    }
+    .stat-card .sc-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+    .stat-card .sc-value { font-size: 28px; font-weight: 700; color: var(--pri); line-height: 1.1; margin: 4px 0; }
+    .stat-card .sc-sub   { font-size: 11px; color: var(--muted); }
+    .stat-card.green .sc-value { color: var(--sec); }
+    .stat-card.amber .sc-value { color: var(--warn); }
+    .stat-card.red   .sc-value { color: var(--danger); }
+
+    /* ── Gráfico de cobertura ─────────────────────────────── */
+    .chart-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px; margin-bottom: 24px;
+    }
+    @media (max-width: 768px) { .chart-row { grid-template-columns: 1fr; } }
+    .chart-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px;
+      box-shadow: var(--shadow);
+    }
+    .chart-card h3 { font-size: 13px; font-weight: 600; color: var(--pri); margin-bottom: 14px; }
+    .chart-card canvas { max-height: 220px; }
+
+    /* ── Filtros ──────────────────────────────────────────── */
+    .filters-bar {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 16px;
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+      margin-bottom: 16px; box-shadow: var(--shadow);
+    }
+    .filters-bar .field { display: flex; flex-direction: column; gap: 3px; }
+    .filters-bar label  { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
+    .filters-bar select,
+    .filters-bar input  { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; min-width: 120px; }
+    .filters-bar .spacer { flex: 1; }
+
+    /* ── Tabela nominal ───────────────────────────────────── */
+    .table-wrap {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      overflow: hidden; margin-bottom: 24px;
+    }
+    .table-header {
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .table-header h3 { font-size: 13px; font-weight: 600; color: var(--pri); }
+    .table-count { font-size: 11px; color: var(--muted); }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      background: #F8FAFF; padding: 9px 12px; text-align: left;
+      font-size: 11px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .4px;
+      border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+    tbody tr:hover { background: #F8FAFF; }
+    tbody td { padding: 8px 12px; font-size: 12px; }
+    tbody tr:last-child { border-bottom: none; }
+
+    /* Status badges */
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 12px;
+      font-size: 11px; font-weight: 600; white-space: nowrap;
+    }
+    .badge-adequado     { background: #D1FAE5; color: #065F46; }
+    .badge-parcial      { background: #FEF3C7; color: #92400E; }
+    .badge-nao-atendido { background: #FEE2E2; color: #991B1B; }
+    .badge-inconsistente{ background: #F3F4F6; color: #374151; }
+
+    /* ── Ranking por microárea ────────────────────────────── */
+    .ranking-bar {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+    }
+    .ranking-bar .r-label { font-size: 12px; min-width: 80px; font-weight: 500; }
+    .ranking-bar .r-track {
+      flex: 1; height: 14px; background: var(--border);
+      border-radius: 7px; overflow: hidden;
+    }
+    .ranking-bar .r-fill  { height: 100%; background: var(--sec); border-radius: 7px; transition: width .4s; }
+    .ranking-bar .r-pct   { font-size: 11px; font-weight: 700; color: var(--sec); min-width: 36px; text-align: right; }
+
+    /* ── Paginação ────────────────────────────────────────── */
+    .pagination {
+      display: flex; justify-content: center; gap: 4px;
+      padding: 12px; border-top: 1px solid var(--border);
+    }
+    .pg-btn {
+      padding: 4px 10px; border-radius: 5px; border: 1px solid var(--border);
+      background: #fff; font-size: 12px; cursor: pointer;
+    }
+    .pg-btn:hover { background: var(--pri-lite); border-color: var(--pri); }
+    .pg-btn.active { background: var(--pri); color: #fff; border-color: var(--pri); }
+
+    /* ── Estado vazio ─────────────────────────────────────── */
+    .empty-state {
+      text-align: center; padding: 60px 24px; color: var(--muted);
+    }
+    .empty-state .es-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    .empty-state p  { font-size: 13px; }
+
+    /* ── Ações finais ─────────────────────────────────────── */
+    .actions-bar {
+      display: flex; gap: 10px; flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+
+    /* ── Responsividade básica ────────────────────────────── */
+    @media (max-width: 640px) {
+      .header { padding: 0 16px; }
+      .main { padding: 16px 12px 40px; }
+      .dashboard-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* ── Animações leves ──────────────────────────────────── */
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .fade-in { animation: fadeIn .3s ease both; }
+
+    /* ── Tooltip ──────────────────────────────────────────── */
+    [data-tip] { position: relative; cursor: help; }
+    [data-tip]::after {
+      content: attr(data-tip);
+      position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%);
+      background: #1F2937; color: #fff; padding: 4px 8px;
+      border-radius: 5px; font-size: 11px; white-space: nowrap;
+      pointer-events: none; opacity: 0; transition: opacity .2s;
+    }
+    [data-tip]:hover::after { opacity: 1; }
+
+    /* ── Scrollbar fina ───────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+  </style>
+</head>
+
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     CABEÇALHO
+═══════════════════════════════════════════════════════════ -->
+<header class="header">
+  <div class="header-brand">
+    <div class="header-logo">PQ</div>
+    <div>
+      <div class="header-name">Prima Qualitá Saúde</div>
+      <div class="header-sub">Sistema de Auditoria de Indicadores APS</div>
+    </div>
+  </div>
+  <div class="header-badge">Novo Financiamento APS · Portaria 3.493/2024</div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════════
+     CONTEÚDO PRINCIPAL
+═══════════════════════════════════════════════════════════ -->
+<main class="main">
+
+  <!-- UPLOAD ─────────────────────────────────────────────── -->
+  <section class="upload-section fade-in">
+    <h2>📂 Carregar Arquivos</h2>
+
+    <div class="drop-zone" id="drop-zone">
+      <div class="dz-icon">☁️</div>
+      <h3>Arraste ou clique para selecionar arquivos</h3>
+      <p>Aceita CSV e XLSX · Cadastro AB · Produção PEP · SIAPS · Múltiplos arquivos simultâneos</p>
+      <br>
+      <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
+        📁 Selecionar Arquivos
+      </button>
+      <input type="file" id="file-input" multiple accept=".csv,.xlsx,.xls" />
+    </div>
+
+    <div class="file-list" id="file-list"></div>
+  </section>
+
+  <!-- CONFIGURAÇÕES ──────────────────────────────────────── -->
+  <div class="config-bar fade-in">
+    <div class="field">
+      <label>Data de Referência</label>
+      <input type="date" id="cfg-date" />
+    </div>
+    <div class="field">
+      <label>Município (filtro)</label>
+      <input type="text" id="cfg-municipio" placeholder="Todos" />
+    </div>
+    <div class="field">
+      <label>Equipe (filtro)</label>
+      <input type="text" id="cfg-equipe" placeholder="Todas" />
+    </div>
+    <div class="field">
+      <label>Indicadores</label>
+      <select id="cfg-indicadores" multiple style="min-width:180px;height:80px">
+        <option value="C2" selected>C2 – Desenvolvimento Infantil</option>
+        <option value="C3" selected>C3 – Gestação e Puerpério</option>
+        <option value="C4" selected>C4 – Diabetes</option>
+        <option value="C5" selected>C5 – Hipertensão</option>
+        <option value="C6" selected>C6 – Pessoa Idosa</option>
+        <option value="C7" selected>C7 – Mulher / Prevenção Câncer</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-self:flex-end">
+      <button class="btn btn-primary" id="btn-processar" onclick="processarArquivos()">
+        ▶ Processar
+      </button>
+      <button class="btn btn-outline" onclick="limparTudo()">🗑 Limpar</button>
+    </div>
+  </div>
+
+  <!-- PROGRESSO ──────────────────────────────────────────── -->
+  <div class="progress-wrap" id="progress-wrap">
+    <div class="progress-label" id="progress-label">Aguardando…</div>
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progress-bar"></div>
+    </div>
+    <div class="progress-steps">
+      <span class="step-badge" id="step-parse">1. Leitura</span>
+      <span class="step-badge" id="step-norm">2. Normalização</span>
+      <span class="step-badge" id="step-link">3. Linkagem</span>
+      <span class="step-badge" id="step-ind">4. Indicadores</span>
+      <span class="step-badge" id="step-render">5. Exibição</span>
+    </div>
+  </div>
+
+  <!-- LOG ────────────────────────────────────────────────── -->
+  <div id="log-area"></div>
+
+  <!-- RESULTADOS ─────────────────────────────────────────── -->
+  <section id="results-section">
+
+    <!-- Ações de exportação -->
+    <div class="actions-bar fade-in">
+      <button class="btn btn-success" onclick="exportarPDF()">📄 Exportar PDF</button>
+      <button class="btn btn-outline" onclick="exportarCSV()">📊 Exportar CSV</button>
+      <button class="btn btn-outline" onclick="window.print()">🖨 Imprimir</button>
+    </div>
+
+    <!-- Tabs por indicador -->
+    <div class="tabs-bar" id="tabs-bar">
+      <button class="tab active" data-pane="pane-geral">
+        🏠 Geral
+      </button>
+      <button class="tab" data-pane="pane-c2">
+        C2 <span class="tab-count" id="cnt-c2">0</span>
+      </button>
+      <button class="tab" data-pane="pane-c3">
+        C3 <span class="tab-count" id="cnt-c3">0</span>
+      </button>
+      <button class="tab" data-pane="pane-c4">
+        C4 <span class="tab-count" id="cnt-c4">0</span>
+      </button>
+      <button class="tab" data-pane="pane-c5">
+        C5 <span class="tab-count" id="cnt-c5">0</span>
+      </button>
+      <button class="tab" data-pane="pane-c6">
+        C6 <span class="tab-count" id="cnt-c6">0</span>
+      </button>
+      <button class="tab" data-pane="pane-c7">
+        C7 <span class="tab-count" id="cnt-c7">0</span>
+      </button>
+    </div>
+
+    <!-- PANE GERAL ─────────────────────────────────── -->
+    <div class="tab-pane active" id="pane-geral">
+
+      <div class="dashboard-grid" id="cards-geral"></div>
+
+      <div class="chart-row">
+        <div class="chart-card">
+          <h3>📊 Cobertura por Indicador</h3>
+          <canvas id="chart-cobertura"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>🥧 Distribuição de Status</h3>
+          <canvas id="chart-status"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-card" style="margin-bottom:24px">
+        <h3>📍 Ranking por Microárea</h3>
+        <div id="ranking-microarea"></div>
+      </div>
+
+    </div>
+
+    <!-- PANES POR INDICADOR ─────────────────────────── -->
+    <div class="tab-pane" id="pane-c2">
+      <div class="dashboard-grid" id="cards-c2"></div>
+      <div id="table-c2"></div>
+    </div>
+    <div class="tab-pane" id="pane-c3">
+      <div class="dashboard-grid" id="cards-c3"></div>
+      <div id="table-c3"></div>
+    </div>
+    <div class="tab-pane" id="pane-c4">
+      <div class="dashboard-grid" id="cards-c4"></div>
+      <div id="table-c4"></div>
+    </div>
+    <div class="tab-pane" id="pane-c5">
+      <div class="dashboard-grid" id="cards-c5"></div>
+      <div id="table-c5"></div>
+    </div>
+    <div class="tab-pane" id="pane-c6">
+      <div class="dashboard-grid" id="cards-c6"></div>
+      <div id="table-c6"></div>
+    </div>
+    <div class="tab-pane" id="pane-c7">
+      <div class="dashboard-grid" id="cards-c7"></div>
+      <div id="table-c7"></div>
+    </div>
+
+  </section><!-- /results-section -->
+
+</main>
+
+<!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT — PARTE 1: UI helpers + upload
+═══════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ── Estado global ──────────────────────────────────────────
+const STATE = {
+  filesRaw:   [],   // {file, name, size}
+  patients:   {},   // id → PatientRecord
+  procedures: {},   // patientId → ProcedureRecord[]
+  results:    {},   // id → { C2, C3, … }
+  charts:     {},   // instâncias Chart.js
+  page:       {},   // paginação por indicador
+};
+
+// ── Inicialização da data de referência ───────────────────
+document.getElementById('cfg-date').value =
+  new Date().toISOString().split('T')[0];
+
+// ── Tabs ──────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.pane)?.classList.add('active');
+  });
+});
+
+// ── Drag & drop ───────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('drag-over');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  adicionarArquivos([...e.dataTransfer.files]);
+});
+fileInput.addEventListener('change', () => {
+  adicionarArquivos([...fileInput.files]);
+  fileInput.value = '';
+});
+
+function adicionarArquivos(files) {
+  files.forEach(f => {
+    if (STATE.filesRaw.find(x => x.name === f.name)) return;
+    STATE.filesRaw.push({ file: f, name: f.name, size: f.size });
+  });
+  renderFileList();
+}
+
+function removerArquivo(name) {
+  STATE.filesRaw = STATE.filesRaw.filter(f => f.name !== name);
+  renderFileList();
+}
+
+function renderFileList() {
+  const el = document.getElementById('file-list');
+  el.innerHTML = STATE.filesRaw.map(f => {
+    const icon = f.name.endsWith('.csv') ? '📄' : '📊';
+    const kb   = (f.size / 1024).toFixed(1) + ' KB';
+    return `
+      <div class="file-chip">
+        <span class="chip-icon">${icon}</span>
+        <span class="chip-name" title="${f.name}">${f.name}</span>
+        <span class="chip-size">${kb}</span>
+        <span class="chip-remove" onclick="removerArquivo('${f.name}')" title="Remover">×</span>
+      </div>`;
+  }).join('');
+}
+
+// ── Progresso ──────────────────────────────────────────────
+function setProgress(pct, label) {
+  document.getElementById('progress-wrap').classList.add('visible');
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = label;
+}
+
+function setStep(id, state) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'step-badge' + (state === 'done' ? ' done' : state === 'active' ? ' active' : '');
+}
+
+// ── Log de mensagens ───────────────────────────────────────
+function log(msg, type = 'info') {
+  const area = document.getElementById('log-area');
+  const div  = document.createElement('div');
+  div.className = `alert alert-${type} fade-in`;
+  div.innerHTML = msg;
+  area.appendChild(div);
+  // máximo 8 mensagens visíveis
+  while (area.children.length > 8) area.removeChild(area.firstChild);
+}
+
+function clearLog() {
+  document.getElementById('log-area').innerHTML = '';
+}
+
+// ── Limpar tudo ────────────────────────────────────────────
+function limparTudo() {
+  STATE.filesRaw = [];
+  STATE.patients = {};
+  STATE.procedures = {};
+  STATE.results = {};
+  Object.values(STATE.charts).forEach(c => c?.destroy());
+  STATE.charts = {};
+  STATE.page = {};
+  renderFileList();
+  clearLog();
+  document.getElementById('progress-wrap').classList.remove('visible');
+  document.getElementById('results-section').classList.remove('visible');
+}
+</script>
+
+<!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT — PARTE 2: Parser · Normalizador · Linkagem
+═══════════════════════════════════════════════════════════ -->
+<script id="parte2">
+'use strict';
+
+// ══════════════════════════════════════════════════════════
+//  MAPEAMENTO DE COLUNAS
+//  Cada chave canônica → lista de variações aceitas (lower)
+// ══════════════════════════════════════════════════════════
+const COL_MAP = {
+  nome:             ['nome','paciente','pessoa','beneficiario','nome_completo','nomepaciente','nome paciente'],
+  cns:              ['cns','cns_paciente','cartao_sus','cartao_nacional_saude','numero_cns','nscartão','nscartao','cns paciente'],
+  cpf:              ['cpf','cpf_paciente','cpf paciente','documento'],
+  data_nascimento:  ['data_nascimento','dt_nascimento','nascimento','data_nasc','dn','data nasc','datanascimento','dt nasc'],
+  sexo:             ['sexo','genero','sexo_biologico','sexo biológico','sex'],
+  microarea:        ['microarea','micro_area','micro area','área','area','microárea','micro'],
+  equipe:           ['equipe','ine','cod_equipe','nome_equipe','equipe_saude','equipe saúde','equipe saude'],
+  municipio:        ['municipio','cidade','municipio_nome','ibge','municipio nome','município'],
+  condicao:         ['condicao','condicoes','condição','condições','grupo','tipo_paciente','perfil','problema_saude','cid','ciap','situacao'],
+  data_atendimento: ['data_atendimento','data_procedimento','data','dt_atend','dt_procedimento','data atendimento','dataprocedimento','data competencia','competencia'],
+  cod_procedimento: ['cod_procedimento','procedimento','sigtap','cod_sigtap','codigo','cód procedimento','código procedimento','procedimento_codigo','cod proc','codprocedimento'],
+  desc_procedimento:['descricao','desc_procedimento','descricao_procedimento','nome_procedimento','procedimento_nome','descricaoprocedimento','descricao procedimento'],
+  profissional:     ['profissional','nome_profissional','profissional_nome','cbo','categoria','prof'],
+  cbo:              ['cbo','cbo_profissional','categoria_profissional','cod_cbo'],
+  tipo_arquivo:     ['tipo_arquivo','tipo arquivo','fonte','sistema','origem'],
+  gestante:         ['gestante','gravidez','gestacao','prenatal','pre_natal'],
+  vacina_desc:      ['vacina','imunobiologico','imunobiológico','vacina_nome','vacina nome','nome_vacina'],
+  exame_desc:       ['exame','exame_nome','nome_exame','resultado_exame','resultado exame'],
+  peso:             ['peso','peso_kg'],
+  altura:           ['altura','estatura','altura_cm'],
+};
+
+// ══════════════════════════════════════════════════════════
+//  PADRÕES DE PROCEDIMENTO
+//  Detecta o tipo clínico a partir de código SIGTAP ou texto
+// ══════════════════════════════════════════════════════════
+const PROC = {
+  CONSULTA_MED: {
+    kw: ['consulta médica','consulta medica','atendimento médico','atendimento medico','consulta clinica','clinico','medico'],
+    cbo: ['2251','2252','2253','2231','2232','2233','2234'],
+    sig: ['0301010110','0301010129','0301010137','0301010064']
+  },
+  CONSULTA_ENF: {
+    kw: ['consulta enfermagem','consulta de enfermagem','atendimento enfermagem','enfermeiro'],
+    cbo: ['2235'],
+    sig: ['0301010064','0301010072','0301010080']
+  },
+  CONSULTA: {   // médico OU enfermeiro (alias combinado, avaliado depois)
+    kw: ['consulta','atendimento individual'],
+    cbo: [],
+    sig: []
+  },
+  VISITA_ACS: {
+    kw: ['visita domiciliar','visita acs','visita agente','acs','agente comunitário','agente comunitario'],
+    cbo: ['5151','5151-05','515105'],
+    sig: ['0301060100','0301060029','0301060011']
+  },
+  PA_AFERIDA: {
+    kw: ['pressão arterial','pressao arterial','aferição','afericao','pa aferida','pressão','hipertensão','has controle'],
+    cbo: [],
+    sig: ['0101020015','0101020031']
+  },
+  PESO_ALTURA: {
+    kw: ['antropométrica','antropometrica','antropometrico','peso e altura','peso altura','imc','índice massa','indice massa','avaliação nutricional','avaliacao nutricional'],
+    cbo: [],
+    sig: ['0101020023','0101020031']
+  },
+  VAC_INFLUENZA: {
+    kw: ['influenza','gripe','flu','vacina influenza','vacinação influenza'],
+    cbo: [],
+    sig: ['0301010161','0301010170']
+  },
+  VAC_HPV: {
+    kw: ['hpv','papiloma','human papilom','vacina hpv','vacinação hpv'],
+    cbo: [],
+    sig: ['0301010188','0301010196','0301010200']
+  },
+  CITOPATO: {
+    kw: ['citopatológico','citopatologico','papanicolau','pap smear','colo útero','colo utero','coleta cito','exame colo','preventivo cervical'],
+    cbo: [],
+    sig: ['0203010065','0203010073','0203010081']
+  },
+  HBA1C: {
+    kw: ['hemoglobina glicada','hba1c','hb1ac','glicohemoglobina','a1c'],
+    cbo: [],
+    sig: ['0202010317','0202010295','0202010309']
+  },
+  AVALIACAO_PES: {
+    kw: ['pé diabético','pe diabetico','avaliação do pé','avaliacao do pe','avaliação dos pés','avaliacao dos pes','pés diabéticos','pes diabeticos'],
+    cbo: [],
+    sig: []
+  },
+  PRE_NATAL: {
+    kw: ['pré-natal','pre-natal','prenatal','pré natal','pre natal'],
+    cbo: [],
+    sig: ['0301010064','0301010110','0301010129']
+  },
+  DTPA: {
+    kw: ['dtpa','difteria tétano pertussis','difteria tetano pertussis','tríplice bacteriana','triplice bacteriana','dtpa gestante'],
+    cbo: [],
+    sig: []
+  },
+  SAUDE_SEXUAL: {
+    kw: ['saúde sexual','saude sexual','reprodutiva','planejamento familiar','ginecológico','ginecologico','ssra','ssrs'],
+    cbo: [],
+    sig: []
+  },
+  SIFILIS: {
+    kw: ['sífilis','sifilis','vdrl','tpha','treponema','teste rápido sif'],
+    cbo: [],
+    sig: ['0202030512','0202030521','0202030513']
+  },
+  HIV: {
+    kw: ['hiv','anti-hiv','teste hiv','teste rápido hiv'],
+    cbo: [],
+    sig: ['0202030490','0202030512']
+  },
+  HEPATITE_B: {
+    kw: ['hepatite b','hbsag','anti-hbs','hbs ag','teste hepatite b'],
+    cbo: [],
+    sig: ['0202030504','0202030500']
+  },
+};
+
+// ══════════════════════════════════════════════════════════
+//  UTILITÁRIOS DE TEXTO
+// ══════════════════════════════════════════════════════════
+function norm(s) {
+  if (!s && s !== 0) return '';
+  return String(s)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normNome(s) {
+  return norm(s).replace(/\s+/g, ' ');
+}
+
+function normCNS(s) {
+  if (!s) return '';
+  return String(s).replace(/\D/g, '').padStart(15, '').slice(-15);
+}
+
+function normCPF(s) {
+  if (!s) return '';
+  return String(s).replace(/\D/g, '').padStart(11, '').slice(-11);
+}
+
+// Converte diversas representações de data para objeto Date ou null
+function parseDate(v) {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v) ? null : v;
+
+  // Número serial Excel
+  if (typeof v === 'number') {
+    const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+    return isNaN(d) ? null : d;
+  }
+
+  const s = String(v).trim();
+  if (!s) return null;
+
+  // DD/MM/AAAA ou DD-MM-AAAA
+  let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (m) {
+    const y = m[3].length === 2 ? 2000 + +m[3] : +m[3];
+    return new Date(y, +m[2]-1, +m[1]);
+  }
+  // AAAA-MM-DD
+  m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+
+  // AAAA/MM ou competência AAAAMM
+  m = s.match(/^(\d{4})[\/\-](\d{2})$/);
+  if (m) return new Date(+m[1], +m[2]-1, 1);
+  m = s.match(/^(\d{6})$/);
+  if (m) return new Date(+m[0].slice(0,4), +m[0].slice(4,6)-1, 1);
+
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+function diffDays(d1, d2) {
+  return Math.floor((d2 - d1) / 86400000);
+}
+
+function ageAt(dataNasc, ref) {
+  if (!dataNasc || !ref) return null;
+  let age = ref.getFullYear() - dataNasc.getFullYear();
+  const m = ref.getMonth() - dataNasc.getMonth();
+  if (m < 0 || (m === 0 && ref.getDate() < dataNasc.getDate())) age--;
+  return age;
+}
+
+function ageDays(dataNasc, ref) {
+  if (!dataNasc || !ref) return null;
+  return diffDays(dataNasc, ref);
+}
+
+// ══════════════════════════════════════════════════════════
+//  DETECÇÃO AUTOMÁTICA DE CABEÇALHO
+//  Varre as primeiras 15 linhas e escolhe a que tem
+//  mais colunas reconhecidas.
+// ══════════════════════════════════════════════════════════
+const ALL_KNOWN = Object.values(COL_MAP).flat();
+
+function detectHeaderRow(rows) {
+  let bestScore = -1, bestIdx = 0;
+  const max = Math.min(15, rows.length);
+  for (let i = 0; i < max; i++) {
+    const row = rows[i];
+    let score = 0;
+    (Array.isArray(row) ? row : Object.values(row)).forEach(cell => {
+      const n = norm(String(cell ?? ''));
+      if (ALL_KNOWN.some(k => n.includes(k) || k.includes(n.replace(/\s/g,'_')))) score++;
+    });
+    if (score > bestScore) { bestScore = score; bestIdx = i; }
+  }
+  return bestIdx;
+}
+
+// ══════════════════════════════════════════════════════════
+//  MAPEAMENTO DE COLUNAS DETECTADAS → CANÔNICO
+// ══════════════════════════════════════════════════════════
+function buildColIndex(headers) {
+  const index = {};
+  headers.forEach((h, i) => {
+    const hn = norm(String(h ?? ''));
+    for (const [canon, variants] of Object.entries(COL_MAP)) {
+      if (variants.some(v => hn === v || hn.includes(v) || v.includes(hn))) {
+        if (!(canon in index)) index[canon] = i; // primeiro match vence
+      }
+    }
+  });
+  return index;
+}
+
+function getCell(row, colIndex, canon) {
+  const i = colIndex[canon];
+  if (i === undefined) return '';
+  const v = Array.isArray(row) ? row[i] : row[Object.keys(row)[i]];
+  return v ?? '';
+}
+
+// ══════════════════════════════════════════════════════════
+//  DETECÇÃO DO TIPO DE PROCEDIMENTO
+// ══════════════════════════════════════════════════════════
+function detectProcType(cod, desc, cbo) {
+  const dc  = norm(desc);
+  const cc  = String(cod ?? '').replace(/\D/g,'');
+  const cbn = norm(cbo);
+
+  const types = [];
+  for (const [type, pat] of Object.entries(PROC)) {
+    if (type === 'CONSULTA') continue; // alias, não testar diretamente
+    const kwHit  = pat.kw.some(k => dc.includes(k));
+    const sigHit = pat.sig.some(s => cc.startsWith(s.replace(/\D/g,'')));
+    const cboHit = pat.cbo.some(c => cbn.startsWith(c.replace(/\D/g,'')));
+    if (kwHit || sigHit || cboHit) types.push(type);
+  }
+
+  // CONSULTA_MED / CONSULTA_ENF → também marca CONSULTA genérico
+  if (types.includes('CONSULTA_MED') || types.includes('CONSULTA_ENF')) {
+    types.push('CONSULTA');
+  }
+  // Se nenhum match específico mas desc contém "consulta" → CONSULTA genérico
+  if (!types.length && PROC.CONSULTA.kw.some(k => dc.includes(k))) {
+    types.push('CONSULTA');
+  }
+
+  return types; // pode ter múltiplos
+}
+
+// ══════════════════════════════════════════════════════════
+//  DETECÇÃO DAS CONDIÇÕES DO PACIENTE
+// ══════════════════════════════════════════════════════════
+function detectCondicoes(raw) {
+  const r = norm(String(raw ?? ''));
+  return {
+    gestante:   /gestante|gravida|gravidez|gestação|prenatal|pre.?natal/.test(r),
+    diabetes:   /diabetes|diabetico|diabético|dm\b|dm2|dm 2|mellitus/.test(r),
+    hipertensao:/hipertens|has\b|has /.test(r),
+    // idoso e criança derivados da data de nascimento
+  };
+}
+
+// ══════════════════════════════════════════════════════════
+//  PARSER DE UM ARQUIVO
+//  Retorna { cadastros: [], procedimentos: [] }
+// ══════════════════════════════════════════════════════════
+async function parseFile(fileObj) {
+  const { file, name } = fileObj;
+  const ext = name.split('.').pop().toLowerCase();
+
+  let sheetsData = []; // [{sheetName, rows:[[...]]}]
+
+  if (ext === 'csv') {
+    const text = await file.text();
+    const result = Papa.parse(text, { skipEmptyLines: true, header: false });
+    sheetsData = [{ sheetName: 'CSV', rows: result.data }];
+  } else {
+    const buf  = await file.arrayBuffer();
+    const wb   = XLSX.read(buf, { type: 'array', cellDates: false });
+    wb.SheetNames.forEach(sn => {
+      const ws   = wb.Sheets[sn];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+      if (rows.length > 1) sheetsData.push({ sheetName: sn, rows });
+    });
+  }
+
+  const cadastros    = [];
+  const procedimentos = [];
+
+  for (const { sheetName, rows } of sheetsData) {
+    if (rows.length < 2) continue;
+
+    const hdrIdx = detectHeaderRow(rows);
+    const headers = rows[hdrIdx];
+    const colIdx  = buildColIndex(headers);
+    const dataRows = rows.slice(hdrIdx + 1);
+
+    // Heurística: é aba de cadastro ou de produção?
+    const isCadastro = 'data_nascimento' in colIdx || 'condicao' in colIdx ||
+                       (!('data_atendimento' in colIdx) && 'nome' in colIdx && 'cns' in colIdx);
+
+    for (const row of dataRows) {
+      // Pular linhas completamente vazias
+      const vals = Array.isArray(row) ? row : Object.values(row);
+      if (vals.every(v => !String(v ?? '').trim())) continue;
+
+      const get = (c) => String(getCell(row, colIdx, c) ?? '').trim();
+
+      const cns  = normCNS(get('cns'));
+      const cpf  = normCPF(get('cpf'));
+      const nome = normNome(get('nome'));
+
+      if (!cns && !cpf && !nome) continue; // sem identificador → pular
+
+      if (isCadastro) {
+        cadastros.push({
+          _src:        name + '/' + sheetName,
+          cns, cpf, nome,
+          data_nascimento: parseDate(get('data_nascimento')),
+          sexo:        norm(get('sexo')),
+          microarea:   norm(get('microarea')),
+          equipe:      norm(get('equipe')),
+          municipio:   norm(get('municipio')),
+          condicao_raw: get('condicao'),
+          condicoes:   detectCondicoes(get('condicao')),
+        });
+      } else {
+        // Aba de produção / procedimentos
+        const cod  = get('cod_procedimento');
+        const desc = get('desc_procedimento') || get('vacina_desc') || get('exame_desc');
+        const cbo  = get('cbo');
+        const tipos = detectProcType(cod, desc, cbo);
+
+        procedimentos.push({
+          _src:   name + '/' + sheetName,
+          cns, cpf, nome,
+          data:   parseDate(get('data_atendimento')),
+          cod, desc, cbo,
+          tipos,
+          peso:   parseFloat(get('peso')) || null,
+          altura: parseFloat(get('altura')) || null,
+        });
+      }
+    }
+  }
+
+  return { cadastros, procedimentos };
+}
+
+// ══════════════════════════════════════════════════════════
+//  LINKAGEM DE PACIENTES
+//  Ordem: CNS → CPF → Nome normalizado
+//  Constrói STATE.patients e STATE.procedures
+// ══════════════════════════════════════════════════════════
+function linkarPacientes(allCadastros, allProc) {
+  // Índices
+  const byCNS  = {};
+  const byCPF  = {};
+  const byNome = {};
+  let   nextId = 1;
+
+  function findOrCreate(cns, cpf, nome) {
+    // 1. CNS
+    if (cns && byCNS[cns]) return byCNS[cns];
+    // 2. CPF
+    if (cpf && byCPF[cpf]) return byCPF[cpf];
+    // 3. Nome
+    if (nome && byNome[nome]) return byNome[nome];
+    // Criar
+    const id = 'P' + String(nextId++).padStart(6,'0');
+    STATE.patients[id]   = { id, cns, cpf, nome, fontes: [] };
+    STATE.procedures[id] = [];
+    if (cns)  byCNS[cns]   = id;
+    if (cpf)  byCPF[cpf]   = id;
+    if (nome) byNome[nome]  = id;
+    return id;
+  }
+
+  // Carregar cadastros → pacientes mestres
+  for (const c of allCadastros) {
+    const id = findOrCreate(c.cns, c.cpf, c.nome);
+    const p  = STATE.patients[id];
+    // Enriquecer (primeira fonte vence, exceto se vazio)
+    if (c.cns  && !p.cns)  { p.cns = c.cns;  byCNS[c.cns] = id; }
+    if (c.cpf  && !p.cpf)  { p.cpf = c.cpf;  byCPF[c.cpf] = id; }
+    if (c.nome && !p.nome) { p.nome = c.nome; byNome[c.nome] = id; }
+    if (c.data_nascimento && !p.data_nascimento) p.data_nascimento = c.data_nascimento;
+    if (c.sexo      && !p.sexo)      p.sexo      = c.sexo;
+    if (c.microarea && !p.microarea) p.microarea = c.microarea;
+    if (c.equipe    && !p.equipe)    p.equipe    = c.equipe;
+    if (c.municipio && !p.municipio) p.municipio = c.municipio;
+    // Mesclar condições (OR lógico)
+    if (!p.condicoes) p.condicoes = { gestante: false, diabetes: false, hipertensao: false };
+    for (const k of Object.keys(p.condicoes)) {
+      if (c.condicoes[k]) p.condicoes[k] = true;
+    }
+    p.fontes.push(c._src);
+  }
+
+  // Vincular procedimentos aos pacientes
+  for (const pr of allProc) {
+    const id = findOrCreate(pr.cns, pr.cpf, pr.nome);
+    // Enriquecer paciente a partir de dados de produção se ainda vazio
+    const p = STATE.patients[id];
+    if (pr.cns  && !p.cns)  { p.cns = pr.cns;  byCNS[pr.cns] = id; }
+    if (pr.cpf  && !p.cpf)  { p.cpf = pr.cpf;  byCPF[pr.cpf] = id; }
+    if (pr.nome && !p.nome) { p.nome = pr.nome; byNome[pr.nome] = id; }
+    STATE.procedures[id].push(pr);
+  }
+
+  return Object.keys(STATE.patients).length;
+}
+
+// ══════════════════════════════════════════════════════════
+//  PONTO DE ENTRADA — chamado pelo botão Processar
+//  (a função processarArquivos() é definida na Parte 4)
+// ══════════════════════════════════════════════════════════
+async function carregarELinkar() {
+  if (!STATE.filesRaw.length) {
+    log('⚠️ Selecione pelo menos um arquivo antes de processar.', 'warn');
+    return false;
+  }
+
+  STATE.patients   = {};
+  STATE.procedures = {};
+  STATE.results    = {};
+
+  const allCadastros = [];
+  const allProc      = [];
+
+  setStep('step-parse', 'active');
+  setProgress(5, 'Lendo arquivos…');
+
+  for (let i = 0; i < STATE.filesRaw.length; i++) {
+    const f = STATE.filesRaw[i];
+    setProgress(5 + Math.round((i / STATE.filesRaw.length) * 30), `Lendo: ${f.name}`);
+    try {
+      const { cadastros, procedimentos } = await parseFile(f);
+      allCadastros.push(...cadastros);
+      allProc.push(...procedimentos);
+      log(`✅ <b>${f.name}</b> → ${cadastros.length} cadastros, ${procedimentos.length} procedimentos`, 'success');
+    } catch (err) {
+      log(`⚠️ Erro ao ler <b>${f.name}</b>: ${err.message}`, 'warn');
+    }
+  }
+
+  setStep('step-parse', 'done');
+  setStep('step-norm', 'done'); // normalização já ocorre no parse
+  setStep('step-link', 'active');
+  setProgress(40, 'Linkando pacientes…');
+
+  const total = linkarPacientes(allCadastros, allProc);
+  log(`🔗 <b>${total}</b> pacientes únicos identificados (CNS → CPF → Nome)`, 'info');
+
+  setStep('step-link', 'done');
+  return true;
+}
+</script>
+<!-- ══════════════════════════════════════════════════════════
+     JAVASCRIPT — PARTE 3: Motor de Indicadores C2–C7
+     Portaria GM/MS 3.493/2024 · Notas Metodológicas 2025
+═══════════════════════════════════════════════════════════ -->
+<script id="parte3">
+'use strict';
+
+// ══════════════════════════════════════════════════════════
+//  HELPERS INTERNOS DO MOTOR
+// ══════════════════════════════════════════════════════════
+
+/** Filtra procedimentos de um paciente por tipo e janela de tempo */
+function procsDe(id, tipo, refDate, diasJanela) {
+  const corte = diasJanela
+    ? new Date(refDate.getTime() - diasJanela * 86400000)
+    : null;
+  return (STATE.procedures[id] || []).filter(p => {
+    if (!p.tipos.includes(tipo)) return false;
+    if (!p.data) return false;
+    if (corte && p.data < corte) return false;
+    if (p.data > refDate) return false;
+    return true;
+  });
+}
+
+/** Verifica se há pelo menos N visitas com intervalo mínimo entre elas */
+function temVisitasComIntervalo(visitas, n, minDias) {
+  if (visitas.length < n) return false;
+  const datas = visitas
+    .map(v => v.data)
+    .filter(Boolean)
+    .sort((a, b) => a - b);
+  // Verificar se existem N datas com intervalo mínimo entre quaisquer pares consecutivos válidos
+  // Abordagem: greedy — seleciona a maior janela de pares com intervalo >= minDias
+  let count = 1;
+  let last  = datas[0];
+  for (let i = 1; i < datas.length; i++) {
+    if (diffDays(last, datas[i]) >= minDias) {
+      count++;
+      last = datas[i];
+      if (count >= n) return true;
+    }
+  }
+  return count >= n;
+}
+
+/** Classifica por pontuação percentual */
+function classificarPorPontos(pts, total) {
+  const pct = total ? (pts / total) * 100 : 0;
+  if (pct >= 80) return 'ADEQUADO';
+  if (pct >= 40) return 'PARCIAL';
+  return 'NAO_ATENDIDO';
+}
+
+/** Classifica por subindicadores booleanos */
+function classificarBool(subs) {
+  const vals   = Object.values(subs);
+  const total  = vals.length;
+  const feitos = vals.filter(Boolean).length;
+  if (feitos === total)  return 'ADEQUADO';
+  if (feitos === 0)      return 'NAO_ATENDIDO';
+  return 'PARCIAL';
+}
+
+/** Gera lista de pendências legível */
+function pendencias(subs) {
+  return Object.entries(subs)
+    .filter(([, v]) => !v)
+    .map(([k]) => k)
+    .join('; ');
+}
+
+// ══════════════════════════════════════════════════════════
+//  C2 — CUIDADO NO DESENVOLVIMENTO INFANTIL
+//  Elegível: crianças com < 730 dias de vida (< 2 anos)
+//  Ref: Nota Metodológica C2 · SAPS/MS 2025
+// ══════════════════════════════════════════════════════════
+function avaliarC2(id, p, refDate) {
+  const diasVida = ageDays(p.data_nascimento, refDate);
+  if (diasVida === null || diasVida < 0 || diasVida >= 730) return null;
+
+  // Sub C2.1 — Primeira consulta presencial antes de 300 dias de vida
+  const limite300 = p.data_nascimento
+    ? new Date(p.data_nascimento.getTime() + 300 * 86400000)
+    : null;
+  const consultasPrimeiroAno = (STATE.procedures[id] || []).filter(pr =>
+    (pr.tipos.includes('CONSULTA') || pr.tipos.includes('CONSULTA_MED') || pr.tipos.includes('CONSULTA_ENF')) &&
+    pr.data && pr.data >= p.data_nascimento && pr.data <= limite300
+  );
+  const sub1 = !!limite300 && consultasPrimeiroAno.length >= 1;
+
+  // Sub C2.2 — ≥ 9 consultas com registro de peso e altura até 2 anos
+  const consultasTotal = (STATE.procedures[id] || []).filter(pr =>
+    pr.tipos.includes('CONSULTA') && pr.data &&
+    pr.data >= p.data_nascimento && pr.data <= refDate
+  );
+  const sub2 = consultasTotal.length >= 9;
+
+  // Sub C2.3 — ≥ 2 visitas ACS com intervalo ≥ 30 dias nos últimos 12 meses
+  const visitas = procsDe(id, 'VISITA_ACS', refDate, 365);
+  const sub3 = temVisitasComIntervalo(visitas, 2, 30);
+
+  const subs = {
+    'Consulta antes de 300 dias de vida': sub1,
+    '≥ 9 consultas nos primeiros 2 anos': sub2,
+    '≥ 2 visitas ACS (intervalo ≥ 30 dias)': sub3,
+  };
+
+  return {
+    indicador: 'C2',
+    elegivel:  true,
+    status:    classificarBool(subs),
+    subs,
+    pendencias: pendencias(subs),
+    pontos: null,
+    detalhes: `${diasVida}d de vida · ${consultasTotal.length} consultas · ${visitas.length} visitas ACS`,
+  };
+}
+
+// ══════════════════════════════════════════════════════════
+//  C3 — CUIDADO NA GESTAÇÃO E PUERPÉRIO
+//  Elegível: gestantes / puérperas cadastradas
+//  Ref: Nota Metodológica C3 · SAPS/MS 2025
+// ══════════════════════════════════════════════════════════
+function avaliarC3(id, p, refDate) {
+  if (!p.condicoes?.gestante) return null;
+
+  const procs = STATE.procedures[id] || [];
+
+  // Todos pré-natais registrados (sem limite de janela — gestação atual)
+  const preNatal = procs.filter(pr =>
+    (pr.tipos.includes('PRE_NATAL') || pr.tipos.includes('CONSULTA')) &&
+    pr.data && pr.data <= refDate
+  ).sort((a, b) => a.data - b.data);
+
+  // Sub C3.1 — Primeira consulta pré-natal ≤ 12 semanas de gestação (≤ 84 dias)
+  //   Sem DUM registrada, usamos heurística: primeira consulta nos últimos 280 dias
+  const primeiraConsulta = preNatal[0];
+  const sub1 = !!primeiraConsulta && (
+    diffDays(primeiraConsulta.data, refDate) >= (280 - 84) // aproximado
+  );
+
+  // Sub C3.2 — ≥ 7 consultas pré-natal
+  const sub2 = preNatal.length >= 7;
+
+  // Sub C3.3 — ≥ 7 registros de PA
+  const paReg = procsDe(id, 'PA_AFERIDA', refDate, 365);
+  const sub3  = paReg.length >= 7;
+
+  // Sub C3.4 — ≥ 7 registros simultâneos de peso + altura
+  const pesoAltura = procsDe(id, 'PESO_ALTURA', refDate, 365);
+  const sub4 = pesoAltura.length >= 7;
+
+  // Sub C3.5 — ≥ 3 visitas ACS com intervalo ≥ 30 dias
+  const visitas = procsDe(id, 'VISITA_ACS', refDate, 365);
+  const sub5 = temVisitasComIntervalo(visitas, 3, 30);
+
+  // Sub C3.6 — 1 dose dTpa a partir da 20ª semana de gestação
+  const dtpa = procsDe(id, 'DTPA', refDate, 365);
+  const sub6 = dtpa.length >= 1;
+
+  // Sub C3.7 — Testes para sífilis + HIV + hepatite B
+  const sif = procsDe(id, 'SIFILIS',    refDate, 365).length >= 1;
+  const hiv = procsDe(id, 'HIV',        refDate, 365).length >= 1;
+  const hepB= procsDe(id, 'HEPATITE_B', refDate, 365).length >= 1;
+  const sub7 = sif && hiv && hepB;
+
+  const subs = {
+    'Consulta pré-natal até 12ª semana':          sub1,
+    '≥ 7 consultas pré-natal':                    sub2,
+    '≥ 7 registros de PA':                        sub3,
+    '≥ 7 registros de peso e altura':             sub4,
+    '≥ 3 visitas ACS (intervalo ≥ 30 dias)':     sub5,
+    '1 dose dTpa (≥ 20ª semana)':                 sub6,
+    'Testes sífilis + HIV + Hepatite B':           sub7,
+  };
+
+  return {
+    indicador: 'C3',
+    elegivel:  true,
+    status:    classificarBool(subs),
+    subs,
+    pendencias: pendencias(subs),
+    pontos: null,
+    detalhes: `${preNatal.length} consultas PN · PA: ${paReg.length} · Visitas: ${visitas.length}`,
+  };
+}
+
+// ══════════════════════════════════════════════════════════
+//  C4 — CUIDADO DA PESSOA COM DIABETES
+//  Elegível: pessoas com DM cadastradas
+//  Ref: Nota Metodológica C4 · SAPS/MS 2025
+//  Pontuação máxima: 100 pts
+// ══════════════════════════════════════════════════════════
+function avaliarC4(id, p, refDate) {
+  if (!p.condicoes?.diabetes) return null;
+
+  // A — 1 consulta médica ou enfermagem nos últimos 6 meses (20 pts)
+  const consult6m = [
+    ...procsDe(id, 'CONSULTA_MED', refDate, 180),
+    ...procsDe(id, 'CONSULTA_ENF', refDate, 180),
+  ];
+  const subA = consult6m.length >= 1; // 20 pts
+
+  // B — 1 PA aferida nos últimos 6 meses (15 pts)
+  const subB = procsDe(id, 'PA_AFERIDA', refDate, 180).length >= 1; // 15 pts
+
+  // C — Peso + altura nos últimos 12 meses (15 pts)
+  const subC = procsDe(id, 'PESO_ALTURA', refDate, 365).length >= 1; // 15 pts
+
+  // D — 2 visitas ACS com intervalo ≥ 30 dias nos últimos 12 meses (20 pts)
+  const visitas12m = procsDe(id, 'VISITA_ACS', refDate, 365);
+  const subD = temVisitasComIntervalo(visitas12m, 2, 30); // 20 pts
+
+  // E — 1 HbA1c solicitada/avaliada nos últimos 12 meses (15 pts)
+  const subE = procsDe(id, 'HBA1C', refDate, 365).length >= 1; // 15 pts
+
+  // F — 1 avaliação dos pés nos últimos 12 meses (15 pts)
+  const subF = procsDe(id, 'AVALIACAO_PES', refDate, 365).length >= 1; // 15 pts
+
+  const pts = (subA?20:0) + (subB?15:0) + (subC?15:0) +
+              (subD?20:0) + (subE?15:0) + (subF?15:0);
+
+  const subs = {
+    'Consulta médica/enfermagem (6m)': subA,
+    'PA aferida (6m)':                 subB,
+    'Peso e altura (12m)':             subC,
+    '2 visitas ACS (30d intervalo, 12m)': subD,
+    'HbA1c solicitada/avaliada (12m)': subE,
+    'Avaliação dos pés (12m)':         subF,
+  };
+
+  return {
+    indicador: 'C4',
+    elegivel:  true,
+    status:    classificarPorPontos(pts, 100),
+    subs,
+    pendencias: pendencias(subs),
+    pontos: pts,
+    detalhes: `${pts}/100 pts`,
+  };
+}
+
+// ══════════════════════════════════════════════════════════
+//  C5 — CUIDADO DA PESSOA COM HIPERTENSÃO
+//  Elegível: pessoas com HAS cadastradas
+//  Ref: Nota Metodológica C5 · SAPS/MS 2025
+// ══════════════════════════════════════════════════════════
+function avaliarC5(id, p, refDate) {
+  if (!p.condicoes?.hipertensao) return null;
+
+  // A — 1 consulta por semestre (2 semestres = últimos 12 meses) (25 pts)
+  //   Estratégia: verifica 1 consulta nos últimos 6 meses E 1 nos 6-12 meses
+  const sem1 = [ // últimos 0-6 meses
+    ...procsDe(id, 'CONSULTA_MED', refDate, 180),
+    ...procsDe(id, 'CONSULTA_ENF', refDate, 180),
+  ];
+  const refSem2 = new Date(refDate.getTime() - 180 * 86400000);
+  const sem2 = (STATE.procedures[id] || []).filter(pr =>
+    (pr.tipos.includes('CONSULTA_MED') || pr.tipos.includes('CONSULTA_ENF')) &&
+    pr.data && pr.data <= refSem2 &&
+    pr.data >= new Date(refDate.getTime() - 365 * 86400000)
+  );
+  const subA = sem1.length >= 1 && sem2.length >= 1; // 25 pts
+
+  // B — ≥ 1 PA registrada por semestre (25 pts)
+  const pa1 = procsDe(id, 'PA_AFERIDA', refDate, 180);
+  const pa2  = (STATE.procedures[id] || []).filter(pr =>
+    pr.tipos.includes('PA_AFERIDA') && pr.data &&
+    pr.data <= refSem2 && pr.data >= new Date(refDate.getTime() - 365 * 86400000)
+  );
+  const subB = pa1.length >= 1 && pa2.length >= 1; // 25 pts
+
+  // C — ≥ 2 visitas ACS com intervalo ≥ 30 dias (25 pts)
+  const visitas = procsDe(id, 'VISITA_ACS', refDate, 365);
+  const subC = temVisitasComIntervalo(visitas, 2, 30); // 25 pts
+
+  // D — Peso + altura ≥ 1x por ano (25 pts)
+  const subD = procsDe(id, 'PESO_ALTURA', refDate, 365).length >= 1; // 25 pts
+
+  const pts = (subA?25:0) + (subB?25:0) + (subC?25:0) + (subD?25:0);
+
+  const subs = {
+    'Consulta médica/enfermagem (2x/ano, 1/semestre)': subA,
+    'PA registrada (2x/ano, 1/semestre)':              subB,
+    '2 visitas ACS (intervalo ≥ 30 dias, 12m)':        subC,
+    'Peso e altura (12m)':                             subD,
+  };
+
+  return {
+    indicador: 'C5',
+    elegivel:  true,
+    status:    classificarPorPontos(pts, 100),
+    subs,
+    pendencias: pendencias(subs),
+    pontos: pts,
+    detalhes: `${pts}/100 pts · ${sem1.length+sem2.length} consultas · ${pa1.length+pa2.length} PA`,
+  };
+}
+
+// ══════════════════════════════════════════════════════════
+//  C6 — CUIDADO INTEGRAL DA PESSOA IDOSA
+//  Elegível: ≥ 60 anos
+//  Ref: Nota Metodológica C6 · SAPS/MS 2025
+//  4 ações obrigatórias — todas nos últimos 12 meses
+// ══════════════════════════════════════════════════════════
+function avaliarC6(id, p, refDate) {
+  const idade = ageAt(p.data_nascimento, refDate);
+  // Se sem data de nascimento, tenta por condição de idoso no texto (fallback)
+  const ehIdoso = (idade !== null && idade >= 60);
+  if (!ehIdoso) return null;
+
+  // A — 1 consulta médica ou enfermagem nos últimos 12 meses (25 pts)
+  const consult12m = [
+    ...procsDe(id, 'CONSULTA_MED', refDate, 365),
+    ...procsDe(id, 'CONSULTA_ENF', refDate, 365),
+  ];
+  const subA = consult12m.length >= 1;
+
+  // B — Peso + altura simultâneos nos últimos 12 meses (25 pts)
+  const subB = procsDe(id, 'PESO_ALTURA', refDate, 365).length >= 1;
+
+  // C — 2 visitas ACS com intervalo ≥ 30 dias nos últimos 12 meses (25 pts)
+  const visitas = procsDe(id, 'VISITA_ACS', refDate, 365);
+  const subC = temVisitasComIntervalo(visitas, 2, 30);
+
+  // D — 1 dose vacina influenza nos últimos 12 meses (25 pts)
+  const subD = procsDe(id, 'VAC_INFLUENZA', refDate, 365).length >= 1;
+
+  const pts = (subA?25:0) + (subB?25:0) + (subC?25:0) + (subD?25:0);
+
+  const subs = {
+    'Consulta médica/enfermagem (12m)':          subA,
+    'Peso e altura registrados (12m)':           subB,
+    '2 visitas ACS (intervalo ≥ 30 dias, 12m)':  subC,
+    'Vacina Influenza (12m)':                    subD,
+  };
+
+  return {
+    indicador: 'C6',
+    elegivel:  true,
+    status:    classificarPorPontos(pts, 100),
+    subs,
+    pendencias: pendencias(subs),
+    pontos: pts,
+    detalhes: `${idade} anos · ${pts}/100 pts · ${visitas.length} visitas`,
+  };
+}
+
+// ══════════════════════════════════════════════════════════
+//  C7 — CUIDADO DA MULHER NA PREVENÇÃO DO CÂNCER
+//  Elegível: mulheres e homens trans em faixas específicas
+//  Ref: Nota Metodológica C7 · SAPS/MS 2025
+//  3 sub-populações com critérios independentes
+// ══════════════════════════════════════════════════════════
+function avaliarC7(id, p, refDate) {
+  const sexoFem = p.sexo && (p.sexo.startsWith('f') || p.sexo === 'feminino' || p.sexo === '2');
+  if (!sexoFem) return null; // simplificação: inclui trans se cadastrado como F
+
+  const idade = ageAt(p.data_nascimento, refDate);
+  if (idade === null) return null; // sem data de nascimento não é possível avaliar
+
+  const subs   = {};
+  let   elegivel = false;
+
+  // Sub C7.1 — Citopatológico: mulheres 25-64 anos, últimos 36 meses
+  if (idade >= 25 && idade <= 64) {
+    elegivel = true;
+    const cito36m = procsDe(id, 'CITOPATO', refDate, 1095); // 3 anos = 1095 dias
+    subs['Citopatológico (25-64 anos, últimos 3 anos)'] = cito36m.length >= 1;
+  }
+
+  // Sub C7.2 — Vacina HPV: 9-14 anos (feminino), ≥ 1 dose
+  if (idade >= 9 && idade <= 14) {
+    elegivel = true;
+    const hpv = (STATE.procedures[id] || []).filter(pr =>
+      pr.tipos.includes('VAC_HPV') && pr.data && pr.data <= refDate
+    );
+    subs['Vacina HPV (9-14 anos, ≥ 1 dose)'] = hpv.length >= 1;
+  }
+
+  // Sub C7.3 — Saúde Sexual e Reprodutiva: 14-69 anos, últimos 12 meses
+  if (idade >= 14 && idade <= 69) {
+    elegivel = true;
+    const ssra = procsDe(id, 'SAUDE_SEXUAL', refDate, 365);
+    subs['Atendimento saúde sexual/reprodutiva (14-69 anos, 12m)'] = ssra.length >= 1;
+  }
+
+  if (!elegivel || Object.keys(subs).length === 0) return null;
+
+  return {
+    indicador: 'C7',
+    elegivel:  true,
+    status:    classificarBool(subs),
+    subs,
+    pendencias: pendencias(subs),
+    pontos: null,
+    detalhes: `${idade} anos · ${Object.keys(subs).length} critério(s) aplicável(is)`,
+  };
+}
+
+// ══════════════════════════════════════════════════════════
+//  MOTOR PRINCIPAL — avalia todos os indicadores
+//  Popula STATE.results[patientId]
+// ══════════════════════════════════════════════════════════
+const AVALIADORES = { C2: avaliarC2, C3: avaliarC3, C4: avaliarC4,
+                      C5: avaliarC5, C6: avaliarC6, C7: avaliarC7 };
+
+function avaliarIndicadores(indicadoresSel, refDate) {
+  const ids = Object.keys(STATE.patients);
+  let i = 0;
+  for (const id of ids) {
+    const p = STATE.patients[id];
+    STATE.results[id] = {};
+    for (const ind of indicadoresSel) {
+      const fn = AVALIADORES[ind];
+      if (fn) STATE.results[id][ind] = fn(id, p, refDate);
+    }
+    i++;
+    if (i % 200 === 0) {
+      setProgress(55 + Math.round((i / ids.length) * 30),
+        `Avaliando indicadores… ${i}/${ids.length}`);
+    }
+  }
+  setProgress(85, 'Indicadores calculados.');
+}
+
+// ══════════════════════════════════════════════════════════
+//  RESUMO POR INDICADOR
+//  Retorna contagens para dashboard e tabelas
+// ══════════════════════════════════════════════════════════
+function resumoIndicador(ind) {
+  let adequado = 0, parcial = 0, naoAtendido = 0, inconsistente = 0;
+  const rows = [];
+
+  for (const [id, res] of Object.entries(STATE.results)) {
+    const r = res[ind];
+    if (!r || !r.elegivel) continue;
+    const p = STATE.patients[id];
+
+    switch (r.status) {
+      case 'ADEQUADO':     adequado++;     break;
+      case 'PARCIAL':      parcial++;      break;
+      case 'NAO_ATENDIDO': naoAtendido++;  break;
+      default:             inconsistente++;
+    }
+
+    rows.push({
+      id,
+      nome:      p.nome      || '—',
+      cns:       p.cns       || '—',
+      cpf:       p.cpf       || '—',
+      microarea: p.microarea || '—',
+      equipe:    p.equipe    || '—',
+      municipio: p.municipio || '—',
+      status:    r.status,
+      pendencias: r.pendencias || '',
+      detalhes:  r.detalhes  || '',
+      pontos:    r.pontos,
+    });
+  }
+
+  const total = adequado + parcial + naoAtendido + inconsistente;
+  const cobertura = total ? Math.round((adequado / total) * 100) : 0;
+
+  return { total, adequado, parcial, naoAtendido, inconsistente, cobertura, rows };
+}
+</script>
+<!-- placeholder: Parte 4 será inserida aqui -->
+<script id="parte4"></script>
+<!-- placeholder: Parte 5 será inserida aqui -->
+<script id="parte5"></script>
+
+</body>
+</html>
